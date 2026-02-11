@@ -1,24 +1,72 @@
+import * as Haptics from 'expo-haptics';
 import React, { useEffect, useState } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-
-// Check where the camera hole is and move the game down so it doesn't get blocked (youtube video)
 import { SafeAreaView } from 'react-native-safe-area-context';
-
-// This is the mock data and random grid logic
-import { generateRandomGrid, TILE_TYPES } from '../gameData';
+import { TILE_TYPES, generateRandomGrid } from '../gameData';
+import GameEngine from '../logic/GameEngine';
 
 export default function GameScreen({ navigation }) {
-    // Creating a "state" to hold grid of icons
     const [grid, setGrid] = useState([]);
-  
+    const [selectedTile, setSelectedTile] = useState(null);
+    const [score, setScore] = useState(0);
+    const [ecoProgress, setEcoProgress] = useState(0);
+
     useEffect(() => {
-      // When the screen opens, generate the random board
       setGrid(generateRandomGrid());
     }, []);
+
+    // Passive Scan: Automatically clear matches (cascades)
+    useEffect(() => {
+      if (grid.length > 0 && GameEngine.checkForMatches(grid)) {
+        const timer = setTimeout(() => {
+          const matches = GameEngine.findAllMatches(grid);
+          const pointsEarned = matches.length * 10;
+          
+          const processedGrid = GameEngine.processMatches(grid);
+          setGrid(processedGrid);
+
+          setScore(prev => prev + pointsEarned);
+          setEcoProgress(prev => Math.min(prev + (matches.length * 2), 100));
+
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        }, 600);
+
+        return () => clearTimeout(timer);
+      }
+    }, [grid]);
+
+    const handleTilePress = async (row, col) => {
+      const tappedTile = { row, col };
+
+      if (!selectedTile) {
+        await Haptics.selectionAsync();
+        setSelectedTile(tappedTile);
+        return;
+      }
+
+      if (selectedTile.row === row && selectedTile.col === col) {
+        setSelectedTile(null);
+        return;
+      }
+
+      if (GameEngine.isAdjacent(selectedTile, tappedTile)) {
+        const swappedGrid = GameEngine.swapTiles(grid, selectedTile, tappedTile);
+
+        if (GameEngine.checkForMatches(swappedGrid)) {
+          setGrid(swappedGrid);
+          // The passive useEffect will handle the clearing/scoring
+        } else {
+          await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+        }
+        setSelectedTile(null);
+      } else {
+        await Haptics.selectionAsync();
+        setSelectedTile(tappedTile);
+      }
+    };
   
     return (
       <SafeAreaView style={styles.container}>
-        {/*  Header Section  */}
         <View style={styles.header}>
           <TouchableOpacity onPress={() => navigation.goBack()}>
             <Text style={styles.backButton}>⬅ Back</Text>
@@ -26,159 +74,152 @@ export default function GameScreen({ navigation }) {
           
           <View style={styles.scoreContainer}>
             <Text style={styles.scoreLabel}>Eco-Score</Text>
-            <Text style={styles.scoreValue}>0000</Text>
+            <Text style={styles.scoreValue}>{score.toString().padStart(4, '0')}</Text>
           </View>
         </View>
         
-        {/*  EcoMeter Section  */}
         <View style={styles.meterContainer}>
           <View style={styles.meterBackground}>
-            {/* The width: '40%' is a placeholder for your progress logic */}
-            <View style={[styles.meterFill, { width: '40%' }]} /> 
+            <View style={[styles.meterFill, { width: `${ecoProgress}%` }]} /> 
           </View>
-          <Text style={styles.meterText}>EcoMeter: 40% Clean</Text>
+          <Text style={styles.meterText}>EcoMeter: {ecoProgress}% Cleaned</Text>
         </View>
 
-        {/*  The Game Board  */}
         <View style={styles.board}>
           {grid.map((row, rowIndex) => (
             <View key={rowIndex} style={styles.row}>
-              {row.map((tileId, colIndex) => (
-                <View 
-                  key={colIndex} 
-                  style={[
-                    styles.tilePlaceholder, 
-                    { backgroundColor: TILE_TYPES[tileId]?.color }
-                  ]}
-                >
-                  {/* For now just show the first letter */}
-                  <Text style={styles.tileText}>
-                    {TILE_TYPES[tileId]?.name[0]}
-                  </Text>
-                </View>
-              ))}
+              {row.map((tileId, colIndex) => {
+                const isSelected = selectedTile?.row === rowIndex && selectedTile?.col === colIndex;
+                return (
+                  <TouchableOpacity 
+                    key={colIndex} 
+                    onPress={() => handleTilePress(rowIndex, colIndex)}
+                    style={[
+                      styles.tilePlaceholder, 
+                      { backgroundColor: TILE_TYPES[tileId]?.color },
+                      isSelected && styles.tileSelected 
+                    ]}
+                  >
+                    {/* <Text style={styles.tileText}>{TILE_TYPES[tileId]?.name[0]}</Text> */}
+                  </TouchableOpacity>
+                );
+              })}
             </View>
           ))}
         </View>
   
-        {/*  Footer Section   */}
         <View style={styles.footer}>
-          <TouchableOpacity style={styles.actionButton}>
+          <TouchableOpacity 
+            style={styles.actionButton}
+            onPress={async () => await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium)}
+          >
             <Text style={styles.actionButtonText}>RECYCLE COMBO</Text>
           </TouchableOpacity>
-          <Text style={styles.footerText}>
-            Match 3 recyclables to fill the EcoMeter!
-          </Text>
+          <Text style={styles.footerText}>Tap a material to begin sorting!</Text>
         </View>
       </SafeAreaView>
     );
-  }
+}
 
-  const styles = StyleSheet.create({
-    container: { 
-      flex: 1, 
-      backgroundColor: '#f0f4f7' 
-    },
-  
-    header: { 
-      flexDirection: 'row', 
-      justifyContent: 'space-between', 
-      alignItems: 'center', 
-      padding: 20 
-    },
-  
-    backButton: { 
-      fontSize: 18, 
-      color: '#00796b', 
-      fontWeight: 'bold' 
-    },
-  
-    scoreContainer: { 
-      alignItems: 'flex-end' 
-    },
-  
-    scoreLabel: { 
-      fontSize: 14, 
-      color: '#666' 
-    },
-  
-    scoreValue: { 
-      fontSize: 28, 
-      fontWeight: 'bold', 
-      color: '#333' 
-    },
-  
-    board: { 
-      padding: 10, 
-      backgroundColor: '#fff', 
-      borderRadius: 10, 
-      margin: 10,
-      aspectRatio: 1 
-    },
-  
-    row: { 
-      flex: 1, 
-      flexDirection: 'row' 
-    },
-  
-    tilePlaceholder: { 
-      flex: 1, 
-      margin: 2, 
-      borderRadius: 5,
-      justifyContent: 'center',
-      alignItems: 'center'
-    },
-  
-    tileText: {
-      color: 'white',
-      fontWeight: 'bold',
-      fontSize: 18
-    },
-  
-    footer: { 
-      padding: 20, 
-      alignItems: 'center' 
-    },
-  
-    footerText: { 
-      fontSize: 16, 
-      color: '#4caf50', 
-      textAlign: 'center', 
-      fontWeight: '500' 
-    },
-
-    meterContainer: { 
-        paddingHorizontal: 20, 
-        marginBottom: 10 
-      },
-      meterBackground: { 
-        height: 20, 
-        backgroundColor: '#cfd8dc', 
-        borderRadius: 10, 
-        overflow: 'hidden' 
-      },
-      meterFill: { 
-        height: '100%', 
-        backgroundColor: '#4caf50' 
-      },
-      meterText: { 
-        textAlign: 'center', 
-        fontSize: 12, 
-        color: '#00796b', 
-        marginTop: 5, 
-        fontWeight: 'bold' 
-      },
-      actionButton: { 
-        backgroundColor: '#00796b', 
-        paddingVertical: 12, 
-        paddingHorizontal: 30, 
-        borderRadius: 25,
-        marginBottom: 10,
-        elevation: 3
-      },
-      actionButtonText: { 
-        color: 'white', 
-        fontWeight: 'bold', 
-        fontSize: 16 
-      },
-  });
+const styles = StyleSheet.create({
+  // 60% - Deep Dark Green
+  container: { 
+    flex: 1, 
+    backgroundColor: '#0B1A12' 
+  },
+  header: { 
+    flexDirection: 'row', 
+    justifyContent: 'space-between', 
+    alignItems: 'center', 
+    padding: 20 
+  },
+  backButton: { 
+    fontSize: 18, 
+    color: '#1DB954', 
+    fontWeight: 'bold' 
+  },
+  scoreContainer: { 
+    alignItems: 'flex-end' 
+  },
+  scoreLabel: { 
+    fontSize: 12, 
+    color: '#4CAF50',
+    textTransform: 'uppercase'
+  },
+  scoreValue: { 
+    fontSize: 28, 
+    fontWeight: '900', 
+    color: '#CCFF00' // Neon Accent
+  },
+  board: { 
+    padding: 8, 
+    backgroundColor: '#12261B', 
+    borderRadius: 15, 
+    margin: 15,
+    aspectRatio: 1,
+    shadowColor: '#000',
+    shadowOpacity: 0.3,
+    shadowRadius: 15,
+  },
+  row: { flex: 1, flexDirection: 'row' },
+  tilePlaceholder: { 
+    flex: 1, 
+    margin: 3, 
+    borderRadius: 8,
+    justifyContent: 'center',
+    alignItems: 'center'
+  },
+  tileSelected: {
+    borderColor: '#CCFF00', // Neon Glow
+    borderWidth: 4,
+    transform: [{ scale: 1.05 }]
+  },
+  tileText: {
+    color: 'white',
+    fontWeight: '900',
+    fontSize: 20,
+    textShadowColor: 'rgba(0, 0, 0, 0.5)',
+    textShadowRadius: 4
+  },
+  footer: { 
+    padding: 20, 
+    alignItems: 'center',
+    marginTop: 'auto'
+  },
+  footerText: { 
+    fontSize: 14, 
+    color: '#1DB954', 
+    fontWeight: '600' 
+  },
+  meterContainer: { paddingHorizontal: 20, marginBottom: 10 },
+  meterBackground: { 
+    height: 14, 
+    backgroundColor: '#1A3326', 
+    borderRadius: 7, 
+    overflow: 'hidden' 
+  },
+  meterFill: { 
+    height: '100%', 
+    backgroundColor: '#1DB954' // Spotify Green
+  },
+  meterText: { 
+    textAlign: 'center', 
+    fontSize: 12, 
+    color: '#CCFF00', 
+    marginTop: 5, 
+    fontWeight: 'bold' 
+  },
+  actionButton: { 
+    backgroundColor: '#1DB954', 
+    paddingVertical: 15, 
+    paddingHorizontal: 40, 
+    borderRadius: 30,
+    marginBottom: 15,
+  },
+  actionButtonText: { 
+    color: '#0B1A12', 
+    fontWeight: 'bold', 
+    fontSize: 18,
+    letterSpacing: 1
+  },
+});

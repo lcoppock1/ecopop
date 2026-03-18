@@ -21,4 +21,14 @@ export const TILE_TYPES = {
     }
     return initialGrid;
   };
+
+  // Creates a grid with NO matches - so the game only starts when the user makes their first move
+  // (Clears any initial matches without awarding points, until board is clean)
+  export const generateCleanGrid = (GameEngine) => {
+    let grid = generateRandomGrid();
+    while (GameEngine.checkForMatches(grid)) {
+      grid = GameEngine.processMatches(grid);
+    }
+    return grid;
+  };
   

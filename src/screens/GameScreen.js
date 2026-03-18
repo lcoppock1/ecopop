@@ -1,21 +1,27 @@
+// AsyncStorage to save score & ecoProgress when player wins
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Haptics from 'expo-haptics';
 import React, { useEffect, useState } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { TILE_TYPES, generateRandomGrid } from '../gameData';
+import { TILE_TYPES, generateCleanGrid } from '../gameData';
 import GameEngine from '../logic/GameEngine';
 
 export default function GameScreen({ navigation }) {
+    // State for the 6x6 tile grid, selected tile, score, and EcoMeter progress
     const [grid, setGrid] = useState([]);
     const [selectedTile, setSelectedTile] = useState(null);
     const [score, setScore] = useState(0);
     const [ecoProgress, setEcoProgress] = useState(0);
+    // Game only "starts" (awards points) after the user makes their first match
+    const [gameStarted, setGameStarted] = useState(false);
 
+    // Runs once on mount to create a clean grid (no matches - user must make first move)
     useEffect(() => {
-      setGrid(generateRandomGrid());
+      setGrid(generateCleanGrid(GameEngine));
     }, []);
 
-    // Passive Scan: Automatically clear matches (cascades)
+    // Passive Scan: Automatically clear matches (cascades) when grid has 3+ in a row
     useEffect(() => {
       if (grid.length > 0 && GameEngine.checkForMatches(grid)) {
         const timer = setTimeout(() => {
@@ -25,41 +31,65 @@ export default function GameScreen({ navigation }) {
           const processedGrid = GameEngine.processMatches(grid);
           setGrid(processedGrid);
 
-          setScore(prev => prev + pointsEarned);
-          setEcoProgress(prev => Math.min(prev + (matches.length * 2), 100));
-
-          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+          // Only award score & eco progress after user has made their first match
+          if (gameStarted) {
+            setScore(prev => prev + pointsEarned);
+            setEcoProgress(prev => Math.min(prev + (matches.length * 2), 100));
+            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+          }
         }, 600);
 
         return () => clearTimeout(timer);
       }
-    }, [grid]);
+    }, [grid, gameStarted]);
+
+    // Save score and ecoProgress to AsyncStorage when win condition is met (ecoProgress reaches 100)
+    useEffect(() => {
+      if (ecoProgress >= 100) {
+        const saveWinData = async () => {
+          try {
+            await AsyncStorage.setItem('gameScore', score.toString());
+            await AsyncStorage.setItem('gameEcoProgress', ecoProgress.toString());
+          } catch (e) {
+            // If something breaks, log it so we can debug (app keeps running)
+            console.warn('Failed to save win data:', e);
+          }
+        };
+        saveWinData();
+      }
+    }, [ecoProgress, score]);
 
     const handleTilePress = async (row, col) => {
       const tappedTile = { row, col };
 
+      // 1. No tile selected yet, so select this one
       if (!selectedTile) {
         await Haptics.selectionAsync();
         setSelectedTile(tappedTile);
         return;
       }
 
+      // 2. Tapped same tile twice, deselect it
       if (selectedTile.row === row && selectedTile.col === col) {
         setSelectedTile(null);
         return;
       }
 
+      // 3. Try to swap if tiles are adjacent
       if (GameEngine.isAdjacent(selectedTile, tappedTile)) {
         const swappedGrid = GameEngine.swapTiles(grid, selectedTile, tappedTile);
 
         if (GameEngine.checkForMatches(swappedGrid)) {
+          setGameStarted(true); // Now scoring counts - user made their first match
           setGrid(swappedGrid);
           // The passive useEffect will handle the clearing/scoring
         } else {
+          // Invalid swap, give error haptic
           await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
         }
         setSelectedTile(null);
       } else {
+        // Not adjacent, so select the new tile instead
         await Haptics.selectionAsync();
         setSelectedTile(tappedTile);
       }
@@ -67,6 +97,7 @@ export default function GameScreen({ navigation }) {
   
     return (
       <SafeAreaView style={styles.container}>
+        {/* Header with back button and Eco-Score display */}
         <View style={styles.header}>
           <TouchableOpacity onPress={() => navigation.goBack()}>
             <Text style={styles.backButton}>⬅ Back</Text>
@@ -78,6 +109,7 @@ export default function GameScreen({ navigation }) {
           </View>
         </View>
         
+        {/* EcoMeter bar showing cleanup progress (0-100%) */}
         <View style={styles.meterContainer}>
           <View style={styles.meterBackground}>
             <View style={[styles.meterFill, { width: `${ecoProgress}%` }]} /> 
@@ -85,6 +117,7 @@ export default function GameScreen({ navigation }) {
           <Text style={styles.meterText}>EcoMeter: {ecoProgress}% Cleaned</Text>
         </View>
 
+        {/* The 6x6 game board (tap tiles to swap & match) */}
         <View style={styles.board}>
           {grid.map((row, rowIndex) => (
             <View key={rowIndex} style={styles.row}>
@@ -108,6 +141,7 @@ export default function GameScreen({ navigation }) {
           ))}
         </View>
   
+        {/* Footer with RECYCLE COMBO button (placeholder for future feature) */}
         <View style={styles.footer}>
           <TouchableOpacity 
             style={styles.actionButton}

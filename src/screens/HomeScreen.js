@@ -15,11 +15,13 @@ export default function HomeScreen({ navigation }) {
   return (
     <View style={styles.container}>
       <View style={styles.content}>
+        {/* Title with the golden accent color to feel warm and inviting */}
         <Text style={styles.title}>EcoPop!</Text>
         <Text style={styles.subtitle}>
           Clean the world, one match at a time.
         </Text>
         
+        {/* Big mint green PLAY button — the main call to action */}
         <TouchableOpacity style={styles.button} onPress={handleStart}>
           <Text style={styles.buttonText}>PLAY</Text>
         </TouchableOpacity>
@@ -31,10 +33,17 @@ export default function HomeScreen({ navigation }) {
   );
 }
 
+// ─── "Clean Future" palette ───
+// Base:    #0F1923 (deep navy)
+// Surface: #1A2733 (slate)
+// Primary: #00E676 (vivid mint)
+// Accent:  #FFD740 (golden sun)
+// Text:    #FFFFFF / #8BA4B8
+
 const styles = StyleSheet.create({
   container: { 
     flex: 1, 
-    backgroundColor: '#FFFFFF', //
+    backgroundColor: '#0F1923',
     justifyContent: 'center', 
     alignItems: 'center' 
   },
@@ -47,42 +56,40 @@ const styles = StyleSheet.create({
   title: { 
     fontSize: 56, 
     fontWeight: '900', 
-    color: '#000000', 
-    letterSpacing: -1
+    color: '#FFD740',
+    letterSpacing: -1,
   },
 
   subtitle: { 
     fontSize: 18, 
-    color: '#000000', 
+    color: '#8BA4B8',
     marginBottom: 50, 
     textAlign: 'center', 
     paddingHorizontal: 40,
     lineHeight: 24,
-    opacity: 0.8 
   },
 
   button: { 
-    backgroundColor: '#000000', 
+    backgroundColor: '#00E676',
     paddingVertical: 18, 
     paddingHorizontal: 80, 
-    borderRadius: 0, 
-    borderWidth: 1,
-    borderColor: '#000000'
+    borderRadius: 30,
   },
 
   buttonText: { 
-    color: '#FFFFFF', 
+    color: '#0F1923',
     fontSize: 22, 
-    letterSpacing: 2
+    fontWeight: 'bold',
+    letterSpacing: 2,
   },
 
   footerBrand: {
     position: 'absolute',
     bottom: 40,
     fontSize: 12,
-    color: '#000000',
+    color: '#8BA4B8',
     textTransform: 'uppercase',
     letterSpacing: 2,
-    fontWeight: '600'
-  }
+    fontWeight: '600',
+  },
 });

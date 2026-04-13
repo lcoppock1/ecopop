@@ -117,6 +117,37 @@ class GameEngine {
 
         return newGrid;
     }
+
+    // 4. HINT SYSTEM — scans the entire board to find ONE valid swap
+    // Returns two tile positions [{row, col}, {row, col}] or null if no moves
+    // This is what powers the "breathing glow" on suggested tiles
+    findHint(grid) {
+      for (let r = 0; r < 6; r++) {
+        for (let c = 0; c < 6; c++) {
+          // Try swapping right
+          if (c < 5) {
+            const copy = grid.map(row => [...row]);
+            const temp = copy[r][c];
+            copy[r][c] = copy[r][c + 1];
+            copy[r][c + 1] = temp;
+            if (this.checkForMatches(copy)) {
+              return [{ row: r, col: c }, { row: r, col: c + 1 }];
+            }
+          }
+          // Try swapping down
+          if (r < 5) {
+            const copy = grid.map(row => [...row]);
+            const temp = copy[r][c];
+            copy[r][c] = copy[r + 1][c];
+            copy[r + 1][c] = temp;
+            if (this.checkForMatches(copy)) {
+              return [{ row: r, col: c }, { row: r + 1, col: c }];
+            }
+          }
+        }
+      }
+      return null; // no valid moves on the board (dead state)
+    }
   }
 
   // Export a single instance of the engine to GameScreen.js

@@ -7,9 +7,10 @@ import React, { useEffect, useRef, useState } from 'react';
 import {
   Animated,
   Dimensions,
+  Platform,
+  Pressable,
   StyleSheet,
   Text,
-  TouchableOpacity,
   View,
 } from 'react-native';
 
@@ -18,32 +19,32 @@ const TUTORIAL_KEY = 'tutorialComplete';
 // Getting screen width so the card scales nicely on different devices (iPad, phone, etc.)
 const { width: SCREEN_W } = Dimensions.get('window');
 
-// Each step in the tutorial — title, body text, and an icon
-// I kept the text short because nobody wants to read a novel before playing lol
+// Each step in the tutorial — tells the player WHO they are, WHAT they're doing, and WHY
+// I rewrote these to make the narrative super clear so nobody is confused about the game's purpose
 const STEPS = [
   {
-    title: 'Welcome to EcoPop!',
-    body: 'Sort recycling materials by matching tiles. Swipe to swap adjacent tiles and create matches of 3 or more!',
-    icon: '♻️',
+    title: 'You Are an Eco-Agent!',
+    body: "The world's environments are polluted. Your job? Clean them up by sorting recyclable materials — glass, plastic, paper, and metal.",
+    icon: '🦸',
   },
   {
-    title: 'Step 1: Select',
-    body: 'Tap any tile on the board to select it. A golden border will appear around your selection.',
+    title: 'Each Mission = One Place',
+    body: 'Every mission sends you to a polluted environment — a neighborhood, a park, a river, or the ocean. Match enough materials to clean it up!',
+    icon: '🏞️',
+  },
+  {
+    title: 'Tap to Select',
+    body: 'Tap any tile to select it (golden border). Then tap an adjacent tile to swap them. If it makes a match of 3+, those materials get recycled!',
     icon: '👆',
   },
   {
-    title: 'Step 2: Swap',
-    body: 'Tap an adjacent tile (up, down, left, or right) to swap them. If the swap creates a match, it goes through!',
-    icon: '↔️',
-  },
-  {
-    title: 'Step 3: Match & Score',
-    body: 'Line up 3 or more of the same material to clear them. Cascading combos earn bonus points!',
+    title: 'Sort to Score',
+    body: 'Each match earns pounds toward your cleanup goal. Chain combos for bonus points! Reach the target before running out of moves.',
     icon: '✨',
   },
   {
-    title: 'Ready to Clean Up?',
-    body: 'Reach the target score before running out of moves. Earn stars, unlock new levels, and learn real eco facts along the way!',
+    title: 'Clean the World!',
+    body: "Complete missions to restore each environment. You'll earn stars, unlock new places, and learn real eco-facts along the way. Let's go!",
     icon: '🌍',
   },
 ];
@@ -67,6 +68,12 @@ export default function TutorialOverlay({ visible, onFinish }) {
     }
   }, [visible, step]);
 
+  // Keep step index in range if state ever desyncs (avoids STEPS[step] being undefined)
+  useEffect(() => {
+    if (!visible) return;
+    setStep(s => Math.min(STEPS.length - 1, Math.max(0, s)));
+  }, [visible]);
+
   // This handles the slide-out then slide-in transition between steps
   // It fades out the current step, swaps the content, then fades in the next one
   const animateStep = (nextStep) => {
@@ -85,8 +92,9 @@ export default function TutorialOverlay({ visible, onFinish }) {
 
   // "Next" button — go to next step, or finish if we're on the last one
   const handleNext = async () => {
-    if (step < STEPS.length - 1) {
-      animateStep(step + 1);
+    const s = Math.min(STEPS.length - 1, Math.max(0, step));
+    if (s < STEPS.length - 1) {
+      animateStep(s + 1);
     } else {
       await markComplete();
     }
@@ -109,8 +117,9 @@ export default function TutorialOverlay({ visible, onFinish }) {
   // Don't render anything if the tutorial isn't supposed to be showing
   if (!visible) return null;
 
-  const current = STEPS[step];
-  const isLast = step === STEPS.length - 1;
+  const safeStep = Math.min(STEPS.length - 1, Math.max(0, step));
+  const current = STEPS[safeStep] ?? STEPS[0];
+  const isLast = safeStep === STEPS.length - 1;
 
   return (
     <View style={styles.overlay}>
@@ -129,7 +138,7 @@ export default function TutorialOverlay({ visible, onFinish }) {
           {STEPS.map((_, i) => (
             <View
               key={i}
-              style={[styles.dot, i === step && styles.dotActive]}
+              style={[styles.dot, i === safeStep && styles.dotActive]}
             />
           ))}
         </View>
@@ -137,13 +146,27 @@ export default function TutorialOverlay({ visible, onFinish }) {
         {/* Skip only shows on steps 1-4, not the last step */}
         <View style={styles.buttons}>
           {!isLast && (
-            <TouchableOpacity style={styles.skipBtn} onPress={handleSkip}>
+            <Pressable
+              style={({ pressed }) => [
+                styles.skipBtn,
+                Platform.OS === 'web' && { cursor: 'pointer' },
+                pressed && { opacity: 0.85 },
+              ]}
+              onPress={handleSkip}
+            >
               <Text style={styles.skipText}>Skip</Text>
-            </TouchableOpacity>
+            </Pressable>
           )}
-          <TouchableOpacity style={styles.nextBtn} onPress={handleNext}>
+          <Pressable
+            style={({ pressed }) => [
+              styles.nextBtn,
+              Platform.OS === 'web' && { cursor: 'pointer' },
+              pressed && { opacity: 0.9 },
+            ]}
+            onPress={handleNext}
+          >
             <Text style={styles.nextText}>{isLast ? "Let's Go!" : 'Next'}</Text>
-          </TouchableOpacity>
+          </Pressable>
         </View>
       </Animated.View>
     </View>
@@ -171,6 +194,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     zIndex: 999,
+    ...(Platform.OS === 'web' ? { zIndex: 10001 } : null),
   },
   // The actual tutorial card — mint green border to match the game's theme
   card: {
@@ -187,10 +211,12 @@ const styles = StyleSheet.create({
     elevation: 10,
   },
   icon: {
+    fontFamily: 'Quicksand_700Bold',
     fontSize: 52,
     marginBottom: 12,
   },
   title: {
+    fontFamily: 'Quicksand_700Bold',
     fontSize: 22,
     fontWeight: '900',
     color: '#FFFFFF',
@@ -198,6 +224,7 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   body: {
+    fontFamily: 'Quicksand_400Regular',
     fontSize: 15,
     color: '#8BA4B8',
     textAlign: 'center',
@@ -231,6 +258,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
   },
   skipText: {
+    fontFamily: 'Quicksand_700Bold',
     color: '#8BA4B8',
     fontSize: 15,
     fontWeight: '600',
@@ -242,8 +270,8 @@ const styles = StyleSheet.create({
     borderRadius: 25,
   },
   nextText: {
+    fontFamily: 'Quicksand_700Bold',
     color: '#0F1923',
     fontSize: 16,
-    fontWeight: '800',
   },
 });

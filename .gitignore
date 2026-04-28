@@ -7,6 +7,11 @@ node_modules/
 .expo/
 dist/
 web-build/
+
+# Local web export previews / debug outputs (regenerate with: npm run verify)
+_verify_export/
+_web_export_debug/
+_web_export_debug2/
 expo-env.d.ts
 
 # Native

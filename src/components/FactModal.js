@@ -6,9 +6,10 @@ import React, { useEffect, useRef } from 'react';
 import {
   Animated,
   Dimensions,
+  Platform,
+  Pressable,
   StyleSheet,
   Text,
-  TouchableOpacity,
   View,
 } from 'react-native';
 
@@ -71,14 +72,14 @@ export default function LevelIntro({ visible, config, envTheme, ecoTip, onStart 
         </View>
 
         {/* The educational mission objective — this is the goal-oriented design part !! */}
-        {/* Instead of "reach 100 pts" its "Sort 100 kg of waste to plant a Community Garden" */}
+        {/* Instead of "reach 100 pts" its "Sort 100 lb of waste to plant a Community Garden" */}
         <Text style={styles.missionText}>{config.mission}</Text>
 
         {/* Quick stats so the player knows what they're getting into */}
         <View style={styles.statsRow}>
           <View style={styles.statBox}>
             <Text style={styles.statValue}>{config.targetScore}</Text>
-            <Text style={styles.statLabel}>kg target</Text>
+            <Text style={styles.statLabel}>lb target</Text>
           </View>
           <View style={[styles.statBox, styles.statBoxMiddle]}>
             <Text style={styles.statValue}>{config.maxMoves}</Text>
@@ -86,7 +87,7 @@ export default function LevelIntro({ visible, config, envTheme, ecoTip, onStart 
           </View>
           <View style={styles.statBox}>
             <Text style={styles.statValue}>★★★</Text>
-            <Text style={styles.statLabel}>{config.threeStarScore} kg</Text>
+            <Text style={styles.statLabel}>{config.threeStarScore} lb</Text>
           </View>
         </View>
 
@@ -101,9 +102,16 @@ export default function LevelIntro({ visible, config, envTheme, ecoTip, onStart 
 
         {/* The pulsing START button — wrapping it in Animated.View for the scale effect */}
         <Animated.View style={{ transform: [{ scale: pulseAnim }] }}>
-          <TouchableOpacity style={styles.startBtn} onPress={onStart}>
+          <Pressable
+            style={({ pressed }) => [
+              styles.startBtn,
+              Platform.OS === 'web' && { cursor: 'pointer' },
+              pressed && { opacity: 0.88 },
+            ]}
+            onPress={onStart}
+          >
             <Text style={styles.startText}>START MISSION</Text>
-          </TouchableOpacity>
+          </Pressable>
         </Animated.View>
       </Animated.View>
     </View>
@@ -119,6 +127,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     zIndex: 998,
+    ...(Platform.OS === 'web' ? { zIndex: 10000, elevation: 10000 } : null),
   },
   // The main card — mint green border with a subtle green glow shadow
   card: {
@@ -136,6 +145,7 @@ const styles = StyleSheet.create({
   },
   envIcon: {
     fontSize: 56,
+    fontFamily: 'Quicksand_700Bold',
     marginBottom: 8,
   },
   // The mission name badge — semi-transparent green background
@@ -151,20 +161,20 @@ const styles = StyleSheet.create({
   labelText: {
     color: '#00E676',
     fontSize: 13,
-    fontWeight: '800',
+    fontFamily: 'Quicksand_700Bold',
     textTransform: 'uppercase',
     letterSpacing: 1,
   },
   // The main mission text — big and centered so its easy to read
   missionText: {
     fontSize: 18,
-    fontWeight: '700',
+    fontFamily: 'Quicksand_700Bold',
     color: '#FFFFFF',
     textAlign: 'center',
     lineHeight: 26,
     marginBottom: 20,
   },
-  // Three stats in a row: kg target | moves | 3-star threshold
+  // Three stats in a row: lb target | moves | 3-star threshold
   statsRow: {
     flexDirection: 'row',
     marginBottom: 18,
@@ -183,11 +193,12 @@ const styles = StyleSheet.create({
   },
   statValue: {
     fontSize: 20,
-    fontWeight: '900',
+    fontFamily: 'Quicksand_700Bold',
     color: '#FFD740',
   },
   statLabel: {
     fontSize: 11,
+    fontFamily: 'Quicksand_400Regular',
     color: '#8BA4B8',
     textTransform: 'uppercase',
     marginTop: 2,
@@ -205,7 +216,7 @@ const styles = StyleSheet.create({
   },
   tipLabel: {
     fontSize: 10,
-    fontWeight: '800',
+    fontFamily: 'Quicksand_700Bold',
     color: '#40C4FF',
     textTransform: 'uppercase',
     letterSpacing: 1.5,
@@ -213,6 +224,7 @@ const styles = StyleSheet.create({
   },
   tipText: {
     fontSize: 14,
+    fontFamily: 'Quicksand_400Regular',
     color: '#FFFFFF',
     lineHeight: 20,
   },
@@ -230,7 +242,7 @@ const styles = StyleSheet.create({
   startText: {
     color: '#0F1923',
     fontSize: 18,
-    fontWeight: '900',
+    fontFamily: 'Quicksand_700Bold',
     letterSpacing: 1,
   },
 });

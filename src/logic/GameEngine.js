@@ -1,6 +1,25 @@
 // This is the game engine for the game
 //  & The math for matching and swapping inside GameScreen.js
 
+/** Every row must exist and hold 6 tile ids — otherwise grid[r+1][c] throws (e.g. reading '4'). */
+function isGrid6x6(grid) {
+  if (!Array.isArray(grid) || grid.length !== 6) return false;
+  for (let r = 0; r < 6; r++) {
+    if (!Array.isArray(grid[r]) || grid[r].length !== 6) return false;
+  }
+  return true;
+}
+
+function makeRandomGrid6x6() {
+  const g = [];
+  for (let r = 0; r < 6; r++) {
+    const row = [];
+    for (let c = 0; c < 6; c++) row.push(Math.floor(Math.random() * 4) + 1);
+    g.push(row);
+  }
+  return g;
+}
+
 class GameEngine {
     isAdjacent(firstTile, secondTile) {
       // If the user tapped the exact same tile twice, don't swap
@@ -20,6 +39,7 @@ class GameEngine {
   
     // Logic to swap two values in 2D Matrix
     swapTiles(grid, firstTile, secondTile) {
+      if (!isGrid6x6(grid)) return makeRandomGrid6x6();
       // "Deep Copy" of the grid so the original state isn't messed up
       let newGrid = grid.map(row => [...row]);
   
@@ -39,6 +59,8 @@ class GameEngine {
 
     // 2. Search for matches (Returns list of coordinates to clear)
     findAllMatches(grid) {
+        if (!isGrid6x6(grid)) return [];
+
         let matchedCoords = [];
 
         // 1. Check cols & rows (Detects 3, 4, or 5 in a row)
@@ -87,6 +109,7 @@ class GameEngine {
 
     // 3. Refill the grid with new tiles (GRAVITY)
     processMatches(grid) {
+        if (!isGrid6x6(grid)) return makeRandomGrid6x6();
         let newGrid = grid.map(row => [...row]);
         const matches = this.findAllMatches(newGrid);
 
@@ -122,6 +145,7 @@ class GameEngine {
     // Returns two tile positions [{row, col}, {row, col}] or null if no moves
     // This is what powers the "breathing glow" on suggested tiles
     findHint(grid) {
+      if (!isGrid6x6(grid)) return null;
       for (let r = 0; r < 6; r++) {
         for (let c = 0; c < 6; c++) {
           // Try swapping right

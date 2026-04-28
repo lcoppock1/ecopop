@@ -2,9 +2,17 @@
 // Phase 3+4 upgrade: levels are locked/unlocked based on progress,
 // shows star ratings, high scores, lifetime EcoMeter banner, and earned badges
 // Now using the "Clean Future" palette to match the rest of the app
-import * as Haptics from 'expo-haptics';
+import * as Haptics from '../utils/safeHaptics';
 import React, { useCallback, useState } from 'react';
-import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import {
+  Platform,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  useWindowDimensions,
+  View,
+} from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 // I'm pulling the environment themes now too for the little icons on each level card
 import { ENVIRONMENT_THEMES, LEVEL_CONFIG } from '../gameData';
@@ -15,7 +23,8 @@ import { BADGE_DEFINITIONS } from '../badges';
 const LEVEL_IDS = Object.keys(LEVEL_CONFIG).map(Number);
 
 export default function LevelSelect({ navigation }) {
-  // Keeping track of which levels are completed and total eco score
+  const { height: windowH } = useWindowDimensions();
+
   const [completedLevels, setCompletedLevels] = useState({});
   const [totalEco, setTotalEco] = useState(0);
   const [earnedBadges, setEarnedBadges] = useState({});
@@ -26,7 +35,11 @@ export default function LevelSelect({ navigation }) {
   useFocusEffect(
     useCallback(() => {
       loadProgress().then(p => {
-        setCompletedLevels(p.completedLevels);
+        setCompletedLevels(
+          p.completedLevels != null && typeof p.completedLevels === 'object' && !Array.isArray(p.completedLevels)
+            ? p.completedLevels
+            : {}
+        );
         setTotalEco(p.totalEcoScore);
         setEarnedBadges(p.earnedBadges || {});
       });
@@ -50,27 +63,87 @@ export default function LevelSelect({ navigation }) {
     .map(id => BADGE_DEFINITIONS[id]);
 
   return (
-    <ScrollView contentContainerStyle={styles.container}>
-      <Text style={styles.header}>Select a Mission</Text>
+    <View
+      style={[
+        styles.pageRoot,
+        Platform.OS === 'web' && {
+          height: windowH,
+          minHeight: windowH,
+          maxHeight: windowH,
+          overflow: 'hidden',
+        },
+      ]}
+    >
+      <ScrollView
+        style={[styles.scroll, Platform.OS === 'web' && styles.scrollWeb]}
+        contentContainerStyle={[styles.container, Platform.OS === 'web' && styles.containerWeb]}
+        keyboardShouldPersistTaps={Platform.OS === 'web' ? 'always' : 'handled'}
+        showsVerticalScrollIndicator
+        bounces={Platform.OS !== 'web'}
+        scrollEventThrottle={16}
+      >
+      {/* Back to home button so the player can always get back to the title screen */}
+      <TouchableOpacity style={styles.homeBtn} onPress={() => navigation.navigate('Home')}>
+        <Text style={styles.homeBtnText}>← Home</Text>
+      </TouchableOpacity>
 
-      {/* Only show the eco banner if they have some progress saved */}
-      {totalEco > 0 && (
-        <View style={styles.ecoBanner}>
-          <Text style={styles.ecoBannerLabel}>Lifetime Eco-Impact</Text>
-          <Text style={styles.ecoBannerValue}>{totalEco}</Text>
-        </View>
-      )}
+      {/* The player is an Eco-Agent — this header reinforces that identity */}
+      <Text style={styles.header}>Eco-Agent HQ</Text>
+      <Text style={styles.headerSub}>Choose a polluted place to clean up</Text>
+
+      {/* ─── WORLD CLEANUP MAP ─── */}
+      {/* Shows each environment as a tile — polluted (dim) or cleaned (bright) */}
+      {/* This is the "world getting cleaner" visual from my MVP */}
+      {(() => {
+        const completed = Object.keys(completedLevels).length;
+        const total = LEVEL_IDS.length;
+        return (
+          <View style={styles.worldProgress}>
+            <Text style={styles.worldTitle}>
+              {completed === 0 ? 'These places need your help!' :
+               completed < total ? `${completed} of ${total} places restored` :
+               'Every place is clean! You did it!'}
+            </Text>
+            <View style={styles.worldMap}>
+              {LEVEL_IDS.map((id) => {
+                const done = !!completedLevels[id];
+                const theme = ENVIRONMENT_THEMES?.[id];
+                return (
+                  <View key={id} style={styles.worldTile}>
+                    <View style={[
+                      styles.worldTileIcon,
+                      done && theme && { backgroundColor: theme.cleanColor, borderColor: theme.cleanColor },
+                    ]}>
+                      <Text style={{ fontSize: 20 }}>{theme?.icon}</Text>
+                    </View>
+                    <Text style={[styles.worldTileName, done && styles.worldTileNameDone]}>
+                      {theme?.name}
+                    </Text>
+                    <Text style={[styles.worldTileStatus, done && styles.worldTileStatusDone]}>
+                      {done ? 'Cleaned!' : 'Polluted'}
+                    </Text>
+                  </View>
+                );
+              })}
+            </View>
+            {totalEco > 0 && (
+              <Text style={styles.worldEcoTotal}>{totalEco} lb recycled so far</Text>
+            )}
+          </View>
+        );
+      })()}
 
       <View style={styles.cardContainer}>
         {LEVEL_IDS.map((levelId) => {
-          const config = LEVEL_CONFIG[levelId];
+          const config = LEVEL_CONFIG?.[levelId];
           // Check if this level is unlocked (Level 1 always is, others need previous level beaten)
           const unlocked = isLevelUnlocked(levelId, completedLevels);
           // If they've played this level before, pull their saved result
           const result = completedLevels[levelId];
 
           // Grab the theme for this level so I can show the environment icon on the card
-          const theme = ENVIRONMENT_THEMES[levelId];
+          const theme = ENVIRONMENT_THEMES?.[levelId];
+          const starsEarned = Math.min(3, Math.max(0, Math.round(Number(result?.stars) || 0)));
 
           return (
             <TouchableOpacity
@@ -89,28 +162,28 @@ export default function LevelSelect({ navigation }) {
                 </View>
                 <Text style={styles.stars}>
                   {result
-                    ? '★'.repeat(result.stars) + '☆'.repeat(3 - result.stars)
+                    ? '★'.repeat(starsEarned) + '☆'.repeat(3 - starsEarned)
                     : '☆☆☆'}
                 </Text>
               </View>
 
               <Text style={[styles.cardLabel, !unlocked && styles.lockedText]}>
-                {config.label}
+                {config?.label}
               </Text>
 
               {/* This is the educational mission text — shows the goal-oriented objective */}
-              {/* Instead of "Target: 100 pts" its "Sort 100 kg to plant a Community Garden" */}
+              {/* Instead of "Target: 100 pts" its "Sort 100 lb to plant a Community Garden" */}
               <Text style={[styles.cardMission, !unlocked && styles.lockedText]}>
-                {config.mission}
+                {config?.mission}
               </Text>
 
               {/* Quick stats so they know the difficulty before tapping GO */}
               <Text style={[styles.cardGoal, !unlocked && styles.lockedText]}>
-                {config.targetScore} kg  ·  {config.maxMoves} moves
+                {config?.targetScore} lb  ·  {config?.maxMoves} moves
               </Text>
 
               {result && (
-                <Text style={styles.highScore}>Best: {result.highScore} kg</Text>
+                <Text style={styles.highScore}>Best: {result.highScore} lb</Text>
               )}
 
               <View style={[styles.playTag, !unlocked && styles.lockedTag]}>
@@ -123,10 +196,17 @@ export default function LevelSelect({ navigation }) {
         })}
       </View>
 
-      {/* ─── Badges section — shows all earned achievements ─── */}
-      {badgeList.length > 0 && (
-        <View style={styles.badgesSection}>
-          <Text style={styles.badgesTitle}>Achievements</Text>
+      {/* ─── Eco-Agent Badges ─── */}
+      {/* Always visible so the player knows badges exist and wants to earn them */}
+      <View style={styles.badgesSection}>
+        <Text style={styles.badgesTitle}>Your Eco-Agent Badges</Text>
+        <Text style={styles.badgesExplain}>
+          {badgeList.length === 0
+            ? 'Complete missions and hit milestones to earn badges!'
+            : 'Keep playing to unlock more badges.'}
+        </Text>
+
+        {badgeList.length > 0 ? (
           <View style={styles.badgesGrid}>
             {badgeList.map(badge => (
               <View key={badge.id} style={styles.badgeChip}>
@@ -135,14 +215,19 @@ export default function LevelSelect({ navigation }) {
               </View>
             ))}
           </View>
+        ) : (
+          <View style={styles.badgesEmpty}>
+            <Text style={styles.badgesEmptyIcon}>🏅</Text>
+            <Text style={styles.badgesEmptyText}>No badges yet — go clean some places!</Text>
+          </View>
+        )}
 
-          {/* Show how many badges are left to earn so they keep playing */}
-          <Text style={styles.badgesProgress}>
-            {badgeList.length} / {Object.keys(BADGE_DEFINITIONS).length} badges earned
-          </Text>
-        </View>
-      )}
-    </ScrollView>
+        <Text style={styles.badgesProgress}>
+          {badgeList.length} / {Object.keys(BADGE_DEFINITIONS).length} badges
+        </Text>
+      </View>
+      </ScrollView>
+    </View>
   );
 }
 
@@ -156,27 +241,95 @@ export default function LevelSelect({ navigation }) {
 // Text:    #FFFFFF / #8BA4B8
 
 const styles = StyleSheet.create({
+  pageRoot: {
+    flex: 1,
+    width: '100%',
+    backgroundColor: '#0F1923',
+  },
+  scroll: {
+    flex: 1,
+    width: '100%',
+    backgroundColor: '#0F1923',
+  },
+  scrollWeb: {
+    minHeight: 0,
+    flexShrink: 1,
+    overflow: 'auto',
+  },
   container: {
     flexGrow: 1,
     backgroundColor: '#0F1923',
     alignItems: 'center',
     paddingTop: 60,
-    paddingBottom: 40,
+    paddingBottom: 48,
+    width: '100%',
+    maxWidth: 640,
+    alignSelf: 'center',
+    paddingHorizontal: 12,
   },
+  containerWeb: {
+    flexGrow: 0,
+  },
+
+  // Back to home button at the top left
+  homeBtn: { alignSelf: 'flex-start', paddingHorizontal: 24, marginBottom: 4 },
+  homeBtnText: { fontSize: 16, fontFamily: 'Quicksand_700Bold', color: '#40C4FF', fontWeight: 'bold' },
 
   header: {
-    fontSize: 32,
+    fontSize: 28,
+    fontFamily: 'Quicksand_700Bold',
     fontWeight: '900',
     color: '#FFFFFF',
-    marginBottom: 10,
-    textTransform: 'uppercase',
     letterSpacing: 1,
   },
+  headerSub: {
+    fontSize: 14,
+    fontFamily: 'Quicksand_400Regular',
+    color: '#8BA4B8',
+    marginBottom: 16,
+    fontWeight: '600',
+  },
 
-  // Banner that shows total eco score across all levels
-  ecoBanner: { alignItems: 'center', marginBottom: 20 },
-  ecoBannerLabel: { fontSize: 12, color: '#8BA4B8', textTransform: 'uppercase', letterSpacing: 1 },
-  ecoBannerValue: { fontSize: 28, fontWeight: '900', color: '#00E676' },
+  // ─── World Cleanup Map (the "world getting cleaner" visual from my MVP) ───
+  worldProgress: {
+    width: '92%',
+    backgroundColor: '#1A2733',
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 20,
+    alignItems: 'center',
+  },
+  worldTitle: { fontSize: 14, fontFamily: 'Quicksand_700Bold', fontWeight: '800', color: '#8BA4B8', marginBottom: 12 },
+  worldMap: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    width: '100%',
+    justifyContent: 'center',
+    gap: 8,
+    rowGap: 12,
+  },
+  worldTile: { alignItems: 'center', minWidth: 56, flexGrow: 1, maxWidth: 72 },
+  worldTileIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#2A3A4A',
+    borderWidth: 2,
+    borderColor: '#2A3A4A',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  worldTileName: { fontSize: 9, fontFamily: 'Quicksand_700Bold', color: '#4A5A6A', textTransform: 'uppercase' },
+  worldTileNameDone: { color: '#FFFFFF' },
+  worldTileStatus: { fontSize: 8, fontFamily: 'Quicksand_700Bold', color: '#FF6E7F' },
+  worldTileStatusDone: { color: '#00E676' },
+  worldEcoTotal: {
+    fontSize: 13,
+    fontFamily: 'Quicksand_700Bold',
+    color: '#00E676',
+    marginTop: 12,
+  },
 
   cardContainer: { width: '100%', alignItems: 'center' },
 
@@ -201,17 +354,17 @@ const styles = StyleSheet.create({
   },
 
   cardTitleRow: { flexDirection: 'row', alignItems: 'center' },
-  cardEnvIcon: { fontSize: 22, marginRight: 8 },
-  levelTitle: { fontSize: 22, fontWeight: 'bold', color: '#FFFFFF' },
+  cardEnvIcon: { fontSize: 22, fontFamily: 'Quicksand_400Regular', marginRight: 8 },
+  levelTitle: { fontSize: 22, fontFamily: 'Quicksand_700Bold', fontWeight: 'bold', color: '#FFFFFF' },
   lockedText: { color: '#4A5A6A' },
 
-  stars: { fontSize: 20, color: '#FFD740' },
+  stars: { fontSize: 20, fontFamily: 'Quicksand_700Bold', color: '#FFD740' },
 
-  cardLabel: { fontSize: 16, fontWeight: '600', color: '#40C4FF', marginBottom: 2 },
-  cardMission: { fontSize: 13, color: '#8BA4B8', lineHeight: 18, marginBottom: 6 },
-  cardGoal: { fontSize: 13, color: '#8BA4B8', opacity: 0.7 },
+  cardLabel: { fontSize: 16, fontFamily: 'Quicksand_400Regular', fontWeight: '600', color: '#40C4FF', marginBottom: 2 },
+  cardMission: { fontSize: 13, fontFamily: 'Quicksand_400Regular', color: '#8BA4B8', lineHeight: 18, marginBottom: 6 },
+  cardGoal: { fontSize: 13, fontFamily: 'Quicksand_400Regular', color: '#8BA4B8', opacity: 0.7 },
 
-  highScore: { fontSize: 13, color: '#00E676', fontWeight: '700', marginTop: 4 },
+  highScore: { fontSize: 13, fontFamily: 'Quicksand_400Regular', color: '#00E676', fontWeight: '700', marginTop: 4 },
 
   playTag: {
     alignSelf: 'flex-end',
@@ -221,12 +374,12 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     marginTop: 10,
   },
-  playTagText: { color: '#0F1923', fontWeight: 'bold', fontSize: 14, letterSpacing: 1 },
+  playTagText: { color: '#0F1923', fontSize: 14, fontFamily: 'Quicksand_700Bold', letterSpacing: 1 },
 
   lockedTag: { backgroundColor: '#1A2733', borderWidth: 1, borderColor: '#2A3A4A' },
   lockedTagText: { color: '#4A5A6A' },
 
-  // ─── Badges / Achievements section at the bottom ───
+  // ─── Eco-Agent Badges section ───
   badgesSection: {
     width: '85%',
     marginTop: 30,
@@ -236,13 +389,24 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   badgesTitle: {
-    fontSize: 22,
-    fontWeight: '900',
+    fontSize: 18,
+    fontFamily: 'Quicksand_700Bold',
     color: '#FFD740',
-    marginBottom: 14,
-    textTransform: 'uppercase',
-    letterSpacing: 1,
+    marginBottom: 4,
   },
+  badgesExplain: {
+    fontSize: 12,
+    fontFamily: 'Quicksand_400Regular',
+    color: '#8BA4B8',
+    marginBottom: 14,
+    textAlign: 'center',
+  },
+  badgesEmpty: {
+    alignItems: 'center',
+    paddingVertical: 16,
+  },
+  badgesEmptyIcon: { fontSize: 32, fontFamily: 'Quicksand_700Bold', marginBottom: 6, opacity: 0.4 },
+  badgesEmptyText: { fontSize: 13, fontFamily: 'Quicksand_400Regular', color: '#4A5A6A', fontWeight: '600' },
   badgesGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -259,11 +423,12 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#2A3A4A',
   },
-  badgeChipIcon: { fontSize: 18, marginRight: 6 },
-  badgeChipName: { fontSize: 13, fontWeight: '600', color: '#FFFFFF' },
+  badgeChipIcon: { fontSize: 18, fontFamily: 'Quicksand_700Bold', marginRight: 6 },
+  badgeChipName: { fontSize: 13, fontFamily: 'Quicksand_400Regular', fontWeight: '600', color: '#FFFFFF' },
   badgesProgress: {
     marginTop: 12,
     fontSize: 13,
+    fontFamily: 'Quicksand_400Regular',
     color: '#8BA4B8',
     fontWeight: '600',
   },

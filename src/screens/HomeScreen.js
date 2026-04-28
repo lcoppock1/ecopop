@@ -1,95 +1,266 @@
-import * as Haptics from 'expo-haptics';
-import React from 'react';
-import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+// This is the very first screen the player sees — the EcoPop title screen
+import * as Haptics from '../utils/safeHaptics';
+import React, { useMemo, useState } from 'react';
+import { Image } from 'expo-image';
+import {
+  Alert,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  useWindowDimensions,
+  View,
+} from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import TutorialOverlay from '../components/TutorialOverlay';
 
 export default function HomeScreen({ navigation }) {
-  
+  const [showTutorial, setShowTutorial] = useState(false);
+  const { width: windowW, height: windowH } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
+
+  const logoSize = useMemo(() => {
+    const horizontalCap = windowW - 32;
+    const verticalRoom = Math.max(280, windowH - insets.top - insets.bottom - 220);
+    return Math.max(
+      140,
+      Math.min(520, horizontalCap * 0.92, verticalRoom * 0.55, windowW * 0.88)
+    );
+  }, [windowW, windowH, insets.top, insets.bottom]);
+
+  const topBar = Math.max(insets.top, 8) + 4;
+  const bottomPad = Math.max(insets.bottom, 16) + 8;
+
   const handleStart = async () => {
-    // 1. Trigger haptic feedback 
     await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    
-    // 2. Navigate to Level Select
     navigation.navigate('LevelSelect');
   };
 
-  return (
-    <View style={styles.container}>
-      <View style={styles.content}>
-        {/* Title with the golden accent color to feel warm and inviting */}
-        <Text style={styles.title}>EcoPop!</Text>
-        <Text style={styles.subtitle}>
-          Clean the world, one match at a time.
+  const handleSettings = async () => {
+    await Haptics.selectionAsync();
+    navigation.navigate('Settings');
+  };
+
+  const handleHowToPlay = async () => {
+    await Haptics.selectionAsync();
+    setShowTutorial(true);
+  };
+
+  const handleEcoPedia = async () => {
+    await Haptics.selectionAsync();
+    Alert.alert('EcoPedia — Coming Soon!', 'Unlock eco-facts for every material as you play. The more you recycle, the more you learn!');
+  };
+
+  const Body = Platform.OS === 'web' ? ScrollView : View;
+  const bodyProps =
+    Platform.OS === 'web'
+      ? {
+          style: styles.scrollRoot,
+          contentContainerStyle: [
+            styles.scrollInner,
+            {
+              paddingTop: topBar + 8,
+              paddingBottom: bottomPad + 24,
+              minHeight: windowH,
+            },
+          ],
+          keyboardShouldPersistTaps: 'always',
+          showsVerticalScrollIndicator: true,
+        }
+      : { style: styles.nativeWrap };
+
+  const mainColumn = (
+    <View
+      style={[
+        styles.mainColumn,
+        Platform.OS === 'web' && {
+          minHeight: Math.max(380, windowH - topBar - bottomPad - 16),
+        },
+      ]}
+    >
+      <TouchableOpacity style={[styles.settingsBtn, { top: topBar }]} onPress={handleSettings}>
+        <Text style={styles.settingsIcon}>⚙️</Text>
+      </TouchableOpacity>
+
+      <View style={styles.contentBlock}>
+        <Image
+          source={require('../../assets/logo.png')}
+          style={[styles.logo, { width: logoSize, height: logoSize }]}
+          contentFit="contain"
+          cachePolicy="memory-disk"
+        />
+        <Text style={[styles.subtitle, windowW < 380 && styles.subtitleNarrow]}>
+          Become an Eco-Agent.{'\n'}Clean the world, one match at a time.
         </Text>
-        
-        {/* Big mint green PLAY button — the main call to action */}
-        <TouchableOpacity style={styles.button} onPress={handleStart}>
+
+        <TouchableOpacity style={[styles.button, windowW < 400 && styles.buttonCompact]} onPress={handleStart}>
           <Text style={styles.buttonText}>PLAY</Text>
         </TouchableOpacity>
+
+        <View style={[styles.secondaryRow, windowW < 420 && styles.secondaryRowStack]}>
+          <TouchableOpacity style={styles.secondaryBtn} onPress={handleHowToPlay}>
+            <Text style={styles.secondaryIcon}>📖</Text>
+            <Text style={styles.secondaryText}>How to Play</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity style={styles.secondaryBtn} onPress={handleEcoPedia}>
+            <Text style={styles.secondaryIcon}>📚</Text>
+            <Text style={styles.secondaryText}>EcoPedia</Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
-      {/* Footer text */}
-      <Text style={styles.footerBrand}>Built for the City</Text>
+      <Text style={[styles.footerBrand, styles.footerBrandFlow]}>Built for the City</Text>
+    </View>
+  );
+
+  return (
+    <View style={styles.outer}>
+      <Body {...bodyProps}>
+        {Platform.OS === 'web' ? mainColumn : <View style={styles.container}>{mainColumn}</View>}
+      </Body>
+
+      <TutorialOverlay visible={showTutorial} onFinish={() => setShowTutorial(false)} />
     </View>
   );
 }
 
-// ─── "Clean Future" palette ───
-// Base:    #0F1923 (deep navy)
-// Surface: #1A2733 (slate)
-// Primary: #00E676 (vivid mint)
-// Accent:  #FFD740 (golden sun)
-// Text:    #FFFFFF / #8BA4B8
-
 const styles = StyleSheet.create({
-  container: { 
-    flex: 1, 
-    backgroundColor: '#0F1923',
-    justifyContent: 'center', 
-    alignItems: 'center' 
-  },
-
-  content: {
+  outer: { flex: 1, backgroundColor: '#0F1923' },
+  nativeWrap: { flex: 1 },
+  scrollRoot: { flex: 1 },
+  scrollInner: {
+    flexGrow: 1,
     alignItems: 'center',
-    zIndex: 2,
+    width: '100%',
   },
 
-  title: { 
-    fontSize: 56, 
-    fontWeight: '900', 
-    color: '#FFD740',
-    letterSpacing: -1,
+  container: {
+    flex: 1,
+    backgroundColor: '#0F1923',
+    width: '100%',
+    minHeight: '100%',
   },
 
-  subtitle: { 
-    fontSize: 18, 
-    color: '#8BA4B8',
-    marginBottom: 50, 
-    textAlign: 'center', 
+  mainColumn: {
+    width: '100%',
+    maxWidth: 560,
+    alignSelf: 'center',
+    position: 'relative',
+    flex: 1,
+    justifyContent: 'space-between',
+  },
+
+  contentBlock: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    width: '100%',
+    paddingTop: 44,
+    paddingHorizontal: 8,
+  },
+
+  settingsBtn: {
+    position: 'absolute',
+    right: 20,
+    zIndex: 10,
+    padding: 8,
+  },
+  settingsIcon: { fontSize: 26 },
+
+  logo: {
+    marginBottom: 8,
+  },
+
+  subtitle: {
+    fontSize: 20,
+    fontFamily: 'Quicksand_700Bold',
+    color: '#FFFFFF',
+    marginBottom: 40,
+    textAlign: 'center',
     paddingHorizontal: 40,
+    lineHeight: 30,
+    textShadowColor: '#00E676',
+    textShadowOffset: { width: 0, height: 2 },
+    textShadowRadius: 8,
+  },
+  subtitleNarrow: {
+    fontSize: 17,
+    paddingHorizontal: 20,
     lineHeight: 24,
+    marginBottom: 28,
   },
 
-  button: { 
+  button: {
     backgroundColor: '#00E676',
-    paddingVertical: 18, 
-    paddingHorizontal: 80, 
+    paddingVertical: 18,
+    paddingHorizontal: 80,
     borderRadius: 30,
+    shadowColor: '#00E676',
+    shadowOpacity: 0.3,
+    shadowRadius: 12,
+    elevation: 6,
+  },
+  buttonCompact: {
+    paddingHorizontal: 48,
   },
 
-  buttonText: { 
+  buttonText: {
     color: '#0F1923',
-    fontSize: 22, 
-    fontWeight: 'bold',
-    letterSpacing: 2,
+    fontSize: 28,
+    fontFamily: 'Quicksand_700Bold',
+    letterSpacing: 3,
+    textShadowColor: 'rgba(255,255,255,0.3)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 2,
+  },
+
+  secondaryRow: {
+    flexDirection: 'row',
+    marginTop: 28,
+    gap: 16,
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+  },
+  secondaryRowStack: {
+    flexDirection: 'column',
+    alignItems: 'center',
+  },
+  secondaryBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#1A2733',
+    paddingVertical: 10,
+    paddingHorizontal: 18,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: '#2A3A4A',
+  },
+  secondaryIcon: { fontSize: 16, marginRight: 6 },
+  secondaryText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontFamily: 'Quicksand_400Regular',
+    textShadowColor: '#40C4FF',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 4,
   },
 
   footerBrand: {
-    position: 'absolute',
-    bottom: 40,
-    fontSize: 12,
-    color: '#8BA4B8',
+    fontSize: 13,
+    color: '#FFFFFF',
     textTransform: 'uppercase',
-    letterSpacing: 2,
-    fontWeight: '600',
+    letterSpacing: 3,
+    fontFamily: 'Quicksand_400Regular',
+    textShadowColor: '#00E676',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 6,
+  },
+  footerBrandFlow: {
+    textAlign: 'center',
+    width: '100%',
+    marginTop: 20,
+    paddingBottom: 4,
   },
 });

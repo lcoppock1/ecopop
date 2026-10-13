@@ -1,6 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { NavigationContainer } from '@react-navigation/native';
-import { createStackNavigator } from '@react-navigation/stack';
+import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import React, { useEffect, useState } from 'react';
 // I added this one line to help with the "safe area" on different phones
 import { SafeAreaProvider } from 'react-native-safe-area-context';
@@ -11,7 +11,7 @@ import HomeScreen from './src/screens/HomeScreen';
 import LevelSelect from './src/screens/LevelSelect';
 
 //instance variable for navigation
-const Stack = createStackNavigator();
+const Stack = createNativeStackNavigator();
 
 export default function App() {
   // Creating a "state" variable to remember if this is the user's first time playing 

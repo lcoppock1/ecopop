@@ -85,6 +85,18 @@ class GameEngine {
         return Array.from(new Set(matchedCoords.map(JSON.stringify)), JSON.parse);
     }
 
+    // Is there at least one adjacent swap that would make a match?
+    hasPossibleMove(grid) {
+        for (let r = 0; r < 6; r++) {
+            for (let c = 0; c < 6; c++) {
+                const here = { row: r, col: c };
+                if (c < 5 && this.checkForMatches(this.swapTiles(grid, here, { row: r, col: c + 1 }))) return true;
+                if (r < 5 && this.checkForMatches(this.swapTiles(grid, here, { row: r + 1, col: c }))) return true;
+            }
+        }
+        return false;
+    }
+
     // 3. Refill the grid with new tiles (GRAVITY)
     processMatches(grid) {
         let newGrid = grid.map(row => [...row]);

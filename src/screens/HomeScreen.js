@@ -1,12 +1,12 @@
-import * as Haptics from 'expo-haptics';
+import * as Haptics from '../utils/haptics';
 import React from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 export default function HomeScreen({ navigation }) {
   
-  const handleStart = async () => {
+  const handleStart = () => {
     // 1. Trigger haptic feedback 
-    await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    Haptics.impactLight();
     
     // 2. Navigate to Level Select
     navigation.navigate('LevelSelect');

@@ -1,4 +1,4 @@
-import * as Haptics from 'expo-haptics';
+import * as Haptics from '../utils/haptics';
 import React, { useEffect, useState } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -15,6 +15,9 @@ export default function GameScreen({ navigation }) {
       setGrid(generateRandomGrid());
     }, []);
 
+    // True while matches are still being cleared, so taps can't swap a stale board
+    const isResolving = grid.length > 0 && GameEngine.checkForMatches(grid);
+
     // Passive Scan: Automatically clear matches (cascades)
     useEffect(() => {
       if (grid.length > 0 && GameEngine.checkForMatches(grid)) {
@@ -22,24 +25,29 @@ export default function GameScreen({ navigation }) {
           const matches = GameEngine.findAllMatches(grid);
           const pointsEarned = matches.length * 10;
           
-          const processedGrid = GameEngine.processMatches(grid);
+          let processedGrid = GameEngine.processMatches(grid);
+          // If the board settles with no possible moves, reshuffle so the game never gets stuck
+          if (!GameEngine.checkForMatches(processedGrid) && !GameEngine.hasPossibleMove(processedGrid)) {
+            processedGrid = generateRandomGrid();
+          }
           setGrid(processedGrid);
 
           setScore(prev => prev + pointsEarned);
           setEcoProgress(prev => Math.min(prev + (matches.length * 2), 100));
 
-          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+          Haptics.success();
         }, 600);
 
         return () => clearTimeout(timer);
       }
     }, [grid]);
 
-    const handleTilePress = async (row, col) => {
+    const handleTilePress = (row, col) => {
+      if (isResolving) return;
       const tappedTile = { row, col };
 
       if (!selectedTile) {
-        await Haptics.selectionAsync();
+        Haptics.selection();
         setSelectedTile(tappedTile);
         return;
       }
@@ -56,11 +64,11 @@ export default function GameScreen({ navigation }) {
           setGrid(swappedGrid);
           // The passive useEffect will handle the clearing/scoring
         } else {
-          await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+          Haptics.error();
         }
         setSelectedTile(null);
       } else {
-        await Haptics.selectionAsync();
+        Haptics.selection();
         setSelectedTile(tappedTile);
       }
     };
@@ -111,7 +119,7 @@ export default function GameScreen({ navigation }) {
         <View style={styles.footer}>
           <TouchableOpacity 
             style={styles.actionButton}
-            onPress={async () => await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium)}
+            onPress={() => Haptics.impactMedium()}
           >
             <Text style={styles.actionButtonText}>RECYCLE COMBO</Text>
           </TouchableOpacity>

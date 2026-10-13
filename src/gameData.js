@@ -108,7 +108,7 @@ export const generateRandomGrid = () => {
             c >= 1 &&
             grid[r - 1][c - 1] === tile &&
             grid[r - 1][c] === tile &&
-            grid[r][c - 1] === tile)
+            row[c - 1] === tile)
         );
         row.push(tile);
       }
